@@ -1,35 +1,41 @@
+# buscador_app.py
+import streamlit as st
 import pandas as pd
 
-def carregar_dados(arquivo):
+st.set_page_config(page_title="Buscador de Palavras", layout="wide")
+
+st.title("🔍 Buscador em Planilha Excel")
+
+# Upload do arquivo Excel
+uploaded_file = st.file_uploader("📤 Envie sua planilha Excel", type=["xlsx"])
+
+if uploaded_file:
     try:
-        df = pd.read_excel(arquivo)
-        print(f"\n✅ {len(df)} registros carregados com sucesso.")
-        return df
+        # Leitura da planilha
+        df = pd.read_excel(uploaded_file, sheet_name=None)
+
+        # Exibir nomes das planilhas
+        sheet_names = list(df.keys())
+        selected_sheet = st.selectbox("Escolha a planilha:", sheet_names)
+        data = df[selected_sheet]
+
+        # Exibir a planilha
+        st.subheader("📄 Visualização da Planilha")
+        st.dataframe(data)
+
+        # Campo de busca
+        termo = st.text_input("🔎 Digite o termo a buscar (sensível à caixa):")
+
+        if termo:
+            # Busca (filtra linhas que contêm o termo em qualquer célula)
+            resultado = data[data.apply(lambda row: row.astype(str).str.contains(termo).any(), axis=1)]
+
+            st.subheader("📌 Resultados da Busca")
+            if not resultado.empty:
+                st.dataframe(resultado)
+            else:
+                st.warning("Nenhum resultado encontrado para o termo buscado.")
     except Exception as e:
-        print(f"❌ Erro ao carregar o arquivo: {e}")
-        return None
-
-def buscar(df, termo):
-    termo = termo.lower()
-    resultados = df[df.apply(lambda row: row.astype(str).str.lower().str.contains(termo).any(), axis=1)]
-    return resultados
-
-def menu_busca(df):
-    while True:
-        termo = input("\n🔍 Digite um termo para buscar (ou 'sair' para encerrar): ").strip()
-        if termo.lower() == 'sair':
-            print("Encerrando busca.")
-            break
-        resultados = buscar(df, termo)
-        if resultados.empty:
-            print("⚠️ Nenhum resultado encontrado.")
-        else:
-            print(f"\n🔎 {len(resultados)} resultado(s) encontrado(s):\n")
-            print(resultados.to_string(index=False))
-
-if __name__ == "__main__":
-    arquivo_excel = "Operadoras.xlsx"
-    df_dados = carregar_dados(arquivo_excel)
-    
-    if df_dados is not None:
-        menu_busca(df_dados)
+        st.error(f"Ocorreu um erro ao processar o arquivo: {e}")
+else:
+    st.info("Aguardando envio de um arquivo Excel (.xlsx)...")
