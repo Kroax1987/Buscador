@@ -1,11 +1,14 @@
 import streamlit as st
 import pandas as pd
 import os
-from io import BytesIO
 from pptx import Presentation
 
 def search_in_excel(file, keyword):
-    df = pd.read_excel(file, sheet_name=None)
+    try:
+        df = pd.read_excel(file, sheet_name=None)
+    except Exception as e:
+        st.error(f"Erro lendo Excel: {e}")
+        return []
     results = []
     for sheet, data in df.items():
         mask = data.applymap(lambda x: keyword.lower() in str(x).lower() if pd.notnull(x) else False)
@@ -15,13 +18,21 @@ def search_in_excel(file, keyword):
     return results
 
 def search_in_txt(file, keyword):
-    text = file.read().decode('utf-8')
+    try:
+        text = file.read().decode('utf-8')
+    except Exception as e:
+        st.error(f"Erro lendo TXT: {e}")
+        return []
     lines = text.splitlines()
     results = [line for line in lines if keyword.lower() in line.lower()]
     return results
 
 def search_in_pptx(file, keyword):
-    prs = Presentation(file)
+    try:
+        prs = Presentation(file)
+    except Exception as e:
+        st.error(f"Erro lendo PPTX: {e}")
+        return []
     results = []
     for i, slide in enumerate(prs.slides):
         for shape in slide.shapes:
