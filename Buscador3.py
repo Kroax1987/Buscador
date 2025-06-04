@@ -1,43 +1,68 @@
 import streamlit as st
 import pandas as pd
 import os
+from io import BytesIO
+from pptx import Presentation
 
-st.set_page_config(page_title="Buscador de Palavras", layout="wide")
-st.title("🔍 Buscador de Palavras - Planilhas Automáticas")
+def search_in_excel(file, keyword):
+    df = pd.read_excel(file, sheet_name=None)
+    results = []
+    for sheet, data in df.items():
+        mask = data.applymap(lambda x: keyword.lower() in str(x).lower() if pd.notnull(x) else False)
+        matched = data[mask.any(axis=1)]
+        if not matched.empty:
+            results.append((sheet, matched))
+    return results
 
-# Arquivos Excel do repositório
-planilhas_disponiveis = {
-    "Chamados Abertos Fechados": "Chamados Abertos Fechados.xlsx",
-    "Circuitos e Designações": "Circuitos e Designações.xlsx",
-    "Operadoras": "Operadoras.xlsx"
-}
+def search_in_txt(file, keyword):
+    text = file.read().decode('utf-8')
+    lines = text.splitlines()
+    results = [line for line in lines if keyword.lower() in line.lower()]
+    return results
 
-# Seleção do arquivo
-arquivo_selecionado = st.selectbox("📁 Escolha o arquivo:", list(planilhas_disponiveis.keys()))
-caminho_arquivo = planilhas_disponiveis[arquivo_selecionado]
+def search_in_pptx(file, keyword):
+    prs = Presentation(file)
+    results = []
+    for i, slide in enumerate(prs.slides):
+        for shape in slide.shapes:
+            if hasattr(shape, "text") and keyword.lower() in shape.text.lower():
+                results.append(f"Slide {i+1}: {shape.text}")
+    return results
 
-if os.path.exists(caminho_arquivo):
-    try:
-        df = pd.read_excel(caminho_arquivo, sheet_name=None)
+st.title("Buscador Inteligente")
 
-        # Seleção da aba
-        sheet_names = list(df.keys())
-        selected_sheet = st.selectbox("📑 Escolha a aba da planilha:", sheet_names)
-        data = df[selected_sheet]
+uploaded_files = st.file_uploader("Faça upload dos arquivos", accept_multiple_files=True)
+keyword = st.text_input("Digite a palavra-chave para busca")
 
-        st.subheader("📄 Visualização da Planilha")
-        st.dataframe(data)
-
-        termo = st.text_input("🔎 Digite o termo a buscar:")
-
-        if termo:
-            resultado = data[data.apply(lambda row: row.astype(str).str.contains(termo, case=False, na=False), axis=1)]
-            st.subheader("📌 Resultados da Busca")
-            if not resultado.empty:
-                st.dataframe(resultado)
+if uploaded_files and keyword:
+    for uploaded_file in uploaded_files:
+        st.subheader(f"Resultados no arquivo: {uploaded_file.name}")
+        ext = os.path.splitext(uploaded_file.name)[1].lower()
+        
+        if ext in ['.xls', '.xlsx']:
+            results = search_in_excel(uploaded_file, keyword)
+            if results:
+                for sheet, df in results:
+                    st.write(f"Na aba {sheet}:")
+                    st.dataframe(df)
             else:
-                st.warning("Nenhum resultado encontrado.")
-    except Exception as e:
-        st.error(f"Erro ao carregar o arquivo: {e}")
-else:
-    st.error(f"Arquivo '{caminho_arquivo}' não encontrado.")
+                st.write("Nenhum resultado encontrado.")
+        
+        elif ext == '.txt':
+            results = search_in_txt(uploaded_file, keyword)
+            if results:
+                for line in results:
+                    st.write(line)
+            else:
+                st.write("Nenhum resultado encontrado.")
+        
+        elif ext == '.pptx':
+            results = search_in_pptx(uploaded_file, keyword)
+            if results:
+                for res in results:
+                    st.write(res)
+            else:
+                st.write("Nenhum resultado encontrado.")
+        
+        else:
+            st.write("Formato de arquivo não suportado.")
