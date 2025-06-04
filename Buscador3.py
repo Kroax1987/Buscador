@@ -1,41 +1,43 @@
-# buscador_app.py
 import streamlit as st
 import pandas as pd
+import os
 
 st.set_page_config(page_title="Buscador de Palavras", layout="wide")
+st.title("🔍 Buscador de Palavras - Planilhas Automáticas")
 
-st.title("🔍 Buscador em Planilha Excel")
+# Arquivos Excel do repositório
+planilhas_disponiveis = {
+    "Chamados Abertos Fechados": "Chamados Abertos Fechados.xlsx",
+    "Circuitos e Designações": "Circuitos e Designações.xlsx",
+    "Operadoras": "Operadoras.xlsx"
+}
 
-# Upload do arquivo Excel
-uploaded_file = st.file_uploader("📤 Envie sua planilha Excel", type=["xlsx"])
+# Seleção do arquivo
+arquivo_selecionado = st.selectbox("📁 Escolha o arquivo:", list(planilhas_disponiveis.keys()))
+caminho_arquivo = planilhas_disponiveis[arquivo_selecionado]
 
-if uploaded_file:
+if os.path.exists(caminho_arquivo):
     try:
-        # Leitura da planilha
-        df = pd.read_excel(uploaded_file, sheet_name=None)
+        df = pd.read_excel(caminho_arquivo, sheet_name=None)
 
-        # Exibir nomes das planilhas
+        # Seleção da aba
         sheet_names = list(df.keys())
-        selected_sheet = st.selectbox("Escolha a planilha:", sheet_names)
+        selected_sheet = st.selectbox("📑 Escolha a aba da planilha:", sheet_names)
         data = df[selected_sheet]
 
-        # Exibir a planilha
         st.subheader("📄 Visualização da Planilha")
         st.dataframe(data)
 
-        # Campo de busca
-        termo = st.text_input("🔎 Digite o termo a buscar (sensível à caixa):")
+        termo = st.text_input("🔎 Digite o termo a buscar:")
 
         if termo:
-            # Busca (filtra linhas que contêm o termo em qualquer célula)
-            resultado = data[data.apply(lambda row: row.astype(str).str.contains(termo).any(), axis=1)]
-
+            resultado = data[data.apply(lambda row: row.astype(str).str.contains(termo, case=False, na=False), axis=1)]
             st.subheader("📌 Resultados da Busca")
             if not resultado.empty:
                 st.dataframe(resultado)
             else:
-                st.warning("Nenhum resultado encontrado para o termo buscado.")
+                st.warning("Nenhum resultado encontrado.")
     except Exception as e:
-        st.error(f"Ocorreu um erro ao processar o arquivo: {e}")
+        st.error(f"Erro ao carregar o arquivo: {e}")
 else:
-    st.info("Aguardando envio de um arquivo Excel (.xlsx)...")
+    st.error(f"Arquivo '{caminho_arquivo}' não encontrado.")
