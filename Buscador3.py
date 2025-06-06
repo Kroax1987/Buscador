@@ -3,9 +3,9 @@ import pandas as pd
 import os
 
 # Caminhos dos arquivos dentro da pasta data/
-PATH_OPERADORAS = "data/Operadoras.xlsx"
-PATH_DESIGNACOES = "data/Circuitos_e_Designacoes.xlsx"
-PATH_CHAMADOS = "data/Chamados_Operadoras.xlsx"
+PATH_OPERADORAS = "Operadoras.xlsx"
+PATH_DESIGNACOES = "Circuitos_e_Designacoes.xlsx"
+PATH_CHAMADOS = "Chamados_Operadoras.xlsx"
 
 st.set_page_config(page_title="Buscador Inteligente", layout="wide")
 
