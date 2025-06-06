@@ -3,7 +3,7 @@ import pandas as pd
 import os
 
 st.set_page_config(page_title="Buscador de Palavras", layout="wide")
-st.title("🔍 Buscador de Palavras - Planilhas Automáticas")
+st.title("🔍 Buscador NOC")
 
 # Arquivos Excel do repositório
 planilhas_disponiveis = {
