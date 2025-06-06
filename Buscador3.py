@@ -2,105 +2,47 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="Buscador de Palavras", layout="wide")
-st.title("🔍 Buscador NOC")
+st.set_page_config(page_title="Buscador Inteligente com Edição", layout="wide")
+st.title("📂 Buscador Inteligente com Edição")
 
-# Arquivos Excel do repositório
-planilhas_disponiveis = {
-    "Chamados Abertos Fechados": "Chamados Abertos Fechados.xlsx",
-    "Circuitos e Designações": "Circuitos e Designações.xlsx",
-    "Operadoras": "Operadoras.xlsx"
-}
+# Sessões para armazenar arquivos e dados
+if 'dataframes' not in st.session_state:
+    st.session_state['dataframes'] = {}
+if 'filenames' not in st.session_state:
+    st.session_state['filenames'] = []
 
-# Seleção do arquivo
-arquivo_selecionado = st.selectbox("📁 Escolha o arquivo:", list(planilhas_disponiveis.keys()))
-caminho_arquivo = planilhas_disponiveis[arquivo_selecionado]
+# Upload de múltiplos arquivos
+uploaded_files = st.file_uploader("Selecione arquivos Excel", type=["xlsx", "xls"], accept_multiple_files=True)
 
-if os.path.exists(caminho_arquivo):
-    try:
-        # Lê todas as abas
-        df = pd.read_excel(caminho_arquivo, sheet_name=None)
+for file in uploaded_files:
+    if file.name not in st.session_state['filenames']:
+        try:
+            df = pd.read_excel(file, engine='openpyxl')
+            st.session_state['dataframes'][file.name] = df
+            st.session_state['filenames'].append(file.name)
+        except Exception as e:
+            st.error(f"Erro ao carregar {file.name}: {e}")
 
-        # Opção para escolher uma aba ou todas as abas
-        sheet_names = list(df.keys())
-        sheet_names.insert(0, "Todas as abas")
-        selected_sheet = st.selectbox("📑 Escolha a aba da planilha:", sheet_names)
+# Campo de busca
+st.subheader("🔍 Buscar Palavra-chave nos Arquivos")
+palavra_chave = st.text_input("Digite a palavra-chave").strip().lower()
 
-        termo = st.text_input("🔎 Digite o termo a buscar:")
+if st.button("Buscar") and palavra_chave:
+    for nome_arquivo, df in st.session_state['dataframes'].items():
+        resultados = df.applymap(lambda x: palavra_chave in str(x).lower() if pd.notnull(x) else False)
+        linhas_encontradas = df[resultados.any(axis=1)]
 
-        if termo:
-            st.subheader("📌 Resultados da Busca")
-
-            if selected_sheet == "Todas as abas":
-                resultados = []
-                for sheet_name, data in df.items():
-                    resultado = data[data.apply(lambda row: row.astype(str).str.contains(termo, case=False, na=False), axis=1)]
-                    if not resultado.empty:
-                        resultados.append((sheet_name, resultado))
-
-                if resultados:
-                    for sheet_name, resultado in resultados:
-                        st.markdown(f"### Aba: {sheet_name}")
-                        st.dataframe(resultado)
-                        csv = resultado.to_csv(index=False).encode('utf-8')
-                        st.download_button(
-                            label=f"📥 Baixar resultados da aba {sheet_name}",
-                            data=csv,
-                            file_name=f'resultados_{sheet_name}.csv',
-                            mime='text/csv'
-                        )
-                else:
-                    st.warning("Nenhum resultado encontrado em nenhuma aba.")
-
-            else:
-                data = df[selected_sheet]
-                resultado = data[data.apply(lambda row: row.astype(str).str.contains(termo, case=False, na=False), axis=1)]
-
-                if not resultado.empty:
-                    st.subheader(f"Resultados na aba '{selected_sheet}'")
-                    st.dataframe(resultado)
-                    csv = resultado.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📥 Baixar resultados",
-                        data=csv,
-                        file_name=f'resultados_{selected_sheet}.csv',
-                        mime='text/csv'
-                    )
-                else:
-                    st.warning("Nenhum resultado encontrado nessa aba.")
+        st.markdown(f"### 📁 {nome_arquivo}")
+        if linhas_encontradas.empty:
+            st.info("Nenhum resultado encontrado.")
         else:
-            st.info("Digite um termo para iniciar a busca.")
+            st.success(f"{len(linhas_encontradas)} resultado(s) encontrado(s).")
+            st.dataframe(linhas_encontradas)
 
-        # 🔽 Adicionar conteúdo se uma aba específica for escolhida
-        if selected_sheet != "Todas as abas":
-            st.markdown("---")
-            st.subheader(f"📝 Adicionar novo conteúdo na aba '{selected_sheet}'")
-
-            aba_df = df[selected_sheet]
-            colunas = aba_df.columns.tolist()
-            novos_dados = {}
-
-            with st.form("formulario_novo_dado"):
-                for coluna in colunas:
-                    novos_dados[coluna] = st.text_input(f"{coluna}:", key=coluna)
-
-                submitted = st.form_submit_button("➕ Adicionar linha")
-                if submitted:
-                    nova_linha = pd.DataFrame([novos_dados])
-                    novo_df = pd.concat([aba_df, nova_linha], ignore_index=True)
-
-                    # Salva no arquivo Excel mantendo as outras abas
-                    with pd.ExcelWriter(caminho_arquivo, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-                        for aba, dados in df.items():
-                            if aba == selected_sheet:
-                                novo_df.to_excel(writer, sheet_name=aba, index=False)
-                            else:
-                                dados.to_excel(writer, sheet_name=aba, index=False)
-
-                    st.success("✅ Nova linha adicionada com sucesso!")
-                    st.rerun()
-
-    except Exception as e:
-        st.error(f"Erro ao carregar o arquivo: {e}")
-else:
-    st.error(f"Arquivo '{caminho_arquivo}' não encontrado.")
+# Exibição das planilhas em abas
+st.subheader("🗂 Planilhas Carregadas")
+if st.session_state['dataframes']:
+    abas = st.tabs(st.session_state['filenames'])
+    for i, nome in enumerate(st.session_state['filenames']):
+        with abas[i]:
+            st.dataframe(st.session_state['dataframes'][nome])
