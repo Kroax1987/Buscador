@@ -50,16 +50,18 @@ def carregar_dados():
         return None
 
 def buscar_palavra(df, palavra):
-    """Busca uma palavra-chave em todas as colunas de um DataFrame."""
+    """Busca uma palavra-chave como texto literal em todas as colunas de um DataFrame."""
     if not palavra:
         return pd.DataFrame()
-    mask = df.apply(lambda row: row.astype(str).str.contains(palavra, case=False, na=False).any(), axis=1)
+    # CORREÇÃO: Adicionado regex=False para garantir uma busca literal, não por expressão regular.
+    mask = df.apply(lambda row: row.astype(str).str.contains(palavra, case=False, na=False, regex=False).any(), axis=1)
     return df[mask]
 
 def destacar_palavra(val, palavra):
     """Função para aplicar estilo: destaca a palavra-chave encontrada em uma célula."""
     val_str = str(val)
-    if palavra and re.search(palavra, val_str, re.IGNORECASE):
+    # Usa re.escape para que a palavra-chave seja tratada literalmente na busca para destaque
+    if palavra and re.search(re.escape(palavra), val_str, re.IGNORECASE):
         return 'background-color: yellow; color: black;'
     return ''
 
@@ -91,7 +93,7 @@ tab_busca, tab_adicionar = st.tabs(["🔍 Buscar Dados", "➕ Adicionar Novo Reg
 with tab_busca:
     st.header("Ferramenta de Busca Rápida")
     if all_data:
-        palavra = st.text_input("Digite uma palavra-chave para buscar em todas as bases:", placeholder="Ex: Oi, Embratel, cancelado...")
+        palavra = st.text_input("Digite uma palavra-chave para buscar em todas as bases:", placeholder="Ex: MPLS, Oi, Embratel, cancelado...")
         if palavra:
             st.markdown("---")
             datasets_map = {
@@ -147,7 +149,6 @@ with tab_adicionar:
                         st.success(f"Registro adicionado com sucesso ao arquivo '{caminho_arquivo}'!")
                         st.info("A página será atualizada para refletir os novos dados.")
                         st.cache_data.clear()
-                        # CORREÇÃO APLICADA: 'st.experimental_rerun()' foi atualizado para 'st.rerun()'.
                         st.rerun() 
                     else:
                         st.error(f"Falha ao salvar o registro: {erro_msg}")
