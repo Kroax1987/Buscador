@@ -51,37 +51,28 @@ def carregar_dados():
 
 def buscar_palavra(df, palavra):
     """Busca uma palavra-chave de forma flexível e robusta, iterando coluna por coluna."""
-    if not palavra:
+    if df is None or df.empty or not palavra:
         return pd.DataFrame()
 
-    # Normaliza a palavra-chave para a busca (remove caracteres especiais, espaços e converte para minúsculas)
     palavra_normalizada = re.sub(r'[^a-zA-Z0-9]', '', str(palavra)).lower()
     if not palavra_normalizada:
         return pd.DataFrame()
 
-    # Cria uma máscara inicial, toda False, com o mesmo índice do DataFrame
     final_mask = pd.Series(False, index=df.index)
 
-    # Itera sobre cada coluna do DataFrame
     for col in df.columns:
-        # Garante que a coluna seja tratada como texto para a busca
-        # O na=False garante que células vazias (NaN) não causem erro e não sejam correspondidas
         try:
             col_normalizada = df[col].astype(str).str.replace(r'[^a-zA-Z0-9]', '', regex=True).str.lower()
             col_mask = col_normalizada.str.contains(palavra_normalizada, na=False)
-            # Combina a máscara da coluna atual com a máscara final usando OU lógico
             final_mask = final_mask | col_mask
         except:
-            # Pula colunas que possam dar erro na conversão (improvável, mas seguro)
             continue
-
-    # Retorna as linhas do DataFrame original onde a máscara final é True
+            
     return df[final_mask]
 
 def destacar_palavra(val, palavra):
     """Função para aplicar estilo: destaca a palavra-chave encontrada em uma célula."""
     val_str = str(val)
-    # Usa re.escape para que a palavra-chave seja tratada literalmente na busca para destaque
     if palavra and re.search(re.escape(palavra), val_str, re.IGNORECASE):
         return 'background-color: yellow; color: black;'
     return ''
@@ -114,6 +105,16 @@ tab_busca, tab_adicionar = st.tabs(["🔍 Buscar Dados", "➕ Adicionar Novo Reg
 with tab_busca:
     st.header("Ferramenta de Busca Rápida")
     if all_data:
+        # ---- LINHA DE DEPURAÇÃO ADICIONADA ----
+        # Isso mostrará a contagem de linhas para cada arquivo carregado.
+        with st.sidebar:
+            st.write("---")
+            st.write("**Status dos Dados Carregados:**")
+            for nome, df_info in all_data.items():
+                st.write(f"- `{nome}`: {len(df_info)} linhas")
+            st.write("---")
+        # ---- FIM DA LINHA DE DEPURAÇÃO ----
+
         palavra = st.text_input("Digite uma palavra-chave para buscar (ex: MPLS, Oi, cancelado):", placeholder="Não é necessário usar [ ] ou ( )")
         
         if palavra:
