@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
-import os
+import re # Importa o módulo de expressões regulares para o highlighting
 
+# --- CONFIGURAÇÕES E CONSTANTES ---
 # Caminhos dos arquivos
 PATH_OPERADORAS = "Operadoras.xlsx"
 PATH_DESIGNACOES = "Circuitos e Designações.xlsx"
@@ -11,49 +12,77 @@ PATH_CHAMADOS = "Chamados Abertos Fechados.xlsx"
 st.set_page_config(page_title="Buscador Inteligente", layout="wide")
 st.title("🔍 Buscador Inteligente de Dados Operacionais")
 
-# Função para carregar os dados
+# --- FUNÇÕES ---
+
 @st.cache_data
 def carregar_dados():
+    """Carrega os dados dos arquivos Excel, retornando os DataFrames."""
     try:
         operadoras_df = pd.read_excel(PATH_OPERADORAS)
         designacoes_df = pd.read_excel(PATH_DESIGNACOES)
         chamados_df = pd.read_excel(PATH_CHAMADOS)
         return operadoras_df, designacoes_df, chamados_df
+    except FileNotFoundError:
+        st.error(f"Erro: Um ou mais arquivos não foram encontrados. Verifique se os arquivos `{PATH_OPERADORAS}`, `{PATH_DESIGNACOES}` e `{PATH_CHAMADOS}` estão na mesma pasta que o script.")
+        return None, None, None
     except Exception as e:
-        st.error(f"Erro ao carregar os arquivos: {e}")
+        st.error(f"Erro inesperado ao carregar os arquivos: {e}")
         return None, None, None
 
-# Função de busca dinâmica
 def buscar_palavra(df, palavra):
-    if palavra:
-        resultados = df[df.apply(lambda row: row.astype(str).str.contains(palavra, case=False, na=False).any(), axis=1)]
-        return resultados.head(3)  # Mostra no máximo 3 resultados
-    return pd.DataFrame()
+    """
+    Busca uma palavra-chave em todas as colunas de um DataFrame.
+    A busca é case-insensitive.
+    """
+    if not palavra:
+        return pd.DataFrame()
+    
+    # Cria uma máscara booleana para as linhas que contêm a palavra
+    mask = df.apply(lambda row: row.astype(str).str.contains(palavra, case=False, na=False).any(), axis=1)
+    resultados = df[mask]
+    return resultados
 
-# Carrega os dados
+def destacar_palavra(val, palavra):
+    """
+    Função para aplicar estilo: destaca a palavra-chave encontrada em uma célula.
+    """
+    val_str = str(val)
+    if palavra and re.search(palavra, val_str, re.IGNORECASE):
+        return 'background-color: yellow'
+    return ''
+
+# --- LÓGICA PRINCIPAL DA APLICAÇÃO ---
+
+# Carrega os dados e armazena em cache
 operadoras_df, designacoes_df, chamados_df = carregar_dados()
 
-# Input da palavra-chave
-palavra = st.text_input("Digite uma palavra-chave para buscar:")
+# Verifica se os dados foram carregados com sucesso antes de continuar
+if all(df is not None for df in [operadoras_df, designacoes_df, chamados_df]):
+    
+    # Input da palavra-chave
+    palavra = st.text_input("Digite uma palavra-chave para buscar:", placeholder="Ex: Oi, Embratel, cancelado...")
 
-if palavra and all([operadoras_df is not None, designacoes_df is not None, chamados_df is not None]):
-    with st.expander("🔌 Resultados - Operadoras", expanded=True):
-        resultados_operadoras = buscar_palavra(operadoras_df, palavra)
-        if not resultados_operadoras.empty:
-            st.dataframe(resultados_operadoras)
-        else:
-            st.info("Nenhum resultado encontrado em Operadoras.")
+    if palavra:
+        st.markdown("---") # Linha divisória
+        
+        # Dicionário para iterar sobre os DataFrames e seus títulos
+        datasets = {
+            "🔌 Resultados - Operadoras": operadoras_df,
+            "📡 Resultados - Circuitos e Designações": designacoes_df,
+            "📁 Resultados - Chamados": chamados_df
+        }
 
-    with st.expander("📡 Resultados - Circuitos e Designações", expanded=True):
-        resultados_designacoes = buscar_palavra(designacoes_df, palavra)
-        if not resultados_designacoes.empty:
-            st.dataframe(resultados_designacoes)
-        else:
-            st.info("Nenhum resultado encontrado em Circuitos e Designações.")
-
-    with st.expander("📁 Resultados - Chamados", expanded=True):
-        resultados_chamados = buscar_palavra(chamados_df, palavra)
-        if not resultados_chamados.empty:
-            st.dataframe(resultados_chamados)
-        else:
-            st.info("Nenhum resultado encontrado em Chamados.")
+        for titulo, df in datasets.items():
+            with st.expander(titulo, expanded=True):
+                resultados = buscar_palavra(df, palavra)
+                
+                if not resultados.empty:
+                    # Aplica o estilo para destacar a palavra encontrada
+                    st.dataframe(
+                        resultados.style.applymap(lambda val: destacar_palavra(val, palavra)),
+                        use_container_width=True
+                    )
+                else:
+                    st.info(f"Nenhum resultado encontrado para '{palavra}' nesta base de dados.")
+else:
+    st.warning("A aplicação não pode iniciar pois os arquivos de dados não foram carregados. Por favor, corrija o erro acima.")
