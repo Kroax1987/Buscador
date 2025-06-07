@@ -46,6 +46,7 @@ def carregar_dados():
         return None
     except Exception as e:
         st.error(f"Erro inesperado ao carregar os arquivos: {e}")
+        st.info("Este erro ('File is not a zip file') geralmente acontece se o arquivo no GitHub estiver corrompido ou for um ponteiro do Git LFS. Por favor, tente baixar o arquivo do seu repositório e abri-lo localmente para verificar sua integridade.")
         return None
 
 def buscar_palavra(df, palavra):
@@ -68,18 +69,14 @@ def adicionar_registro(caminho_arquivo, campos, novos_dados):
         if os.path.exists(caminho_arquivo):
             df = pd.read_excel(caminho_arquivo, engine='openpyxl')
         else:
-            # Cria um DataFrame vazio se o arquivo não existir
             df = pd.DataFrame(columns=campos)
 
-        # Garante que todas as colunas do formulário existam no DataFrame
         for col in campos:
             if col not in df.columns:
                 df[col] = None
 
         nova_linha = pd.DataFrame([novos_dados])
         df = pd.concat([df, nova_linha], ignore_index=True)
-        
-        # Salva o arquivo
         df.to_excel(caminho_arquivo, index=False, engine='openpyxl')
         return True, None
     except Exception as e:
@@ -87,18 +84,14 @@ def adicionar_registro(caminho_arquivo, campos, novos_dados):
 
 # --- LÓGICA PRINCIPAL DA APLICAÇÃO ---
 
-# Carrega os dados
 all_data = carregar_dados()
 
-# Cria as abas principais da aplicação
 tab_busca, tab_adicionar = st.tabs(["🔍 Buscar Dados", "➕ Adicionar Novo Registro"])
 
-# --- ABA DE BUSCA ---
 with tab_busca:
     st.header("Ferramenta de Busca Rápida")
     if all_data:
         palavra = st.text_input("Digite uma palavra-chave para buscar em todas as bases:", placeholder="Ex: Oi, Embratel, cancelado...")
-
         if palavra:
             st.markdown("---")
             datasets_map = {
@@ -106,12 +99,10 @@ with tab_busca:
                 "📡 Resultados - Circuitos e Designações": FILE_DESIGNACOES,
                 "📁 Resultados - Chamados": FILE_CHAMADOS
             }
-
             for titulo, arquivo_nome in datasets_map.items():
                 with st.expander(titulo, expanded=True):
                     df = all_data[arquivo_nome]
                     resultados = buscar_palavra(df, palavra)
-                    
                     if not resultados.empty:
                         st.dataframe(
                             resultados.style.applymap(lambda val: destacar_palavra(val, palavra)),
@@ -122,47 +113,41 @@ with tab_busca:
     else:
         st.warning("A busca está indisponível pois os arquivos de dados não foram carregados.")
 
-# --- ABA DE ADICIONAR REGISTRO ---
 with tab_adicionar:
     st.header("Criar um Novo Registro")
-    st.info("Selecione o tipo de formulário, preencha os dados e clique em 'Salvar'. O novo registro será adicionado ao arquivo Excel correspondente.")
-
-    # Seleção do tipo de formulário
-    tipo_formulario = st.selectbox(
-        "Qual tipo de registro você deseja adicionar?",
-        options=list(CAMPOS_FORMULARIOS.keys())
-    )
-
-    if tipo_formulario:
-        info_form = CAMPOS_FORMULARIOS[tipo_formulario]
-        caminho_arquivo = info_form["arquivo"]
-        campos = info_form["campos"]
-
-        with st.form(key=f"form_{caminho_arquivo}", clear_on_submit=True):
-            st.subheader(f"Formulário: {tipo_formulario}")
-            novos_dados = {}
-            for campo in campos:
-                # Lógica para campos de Data/Hora terem valor padrão
-                if "Data/Hora" in campo:
-                    valor_padrao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                    novos_dados[campo] = st.text_input(f"**{campo}**", value=valor_padrao)
-                # Lógica para campos de texto longos
-                elif campo.lower() in ["obs", "pontos importantes", "ponto importantes", "causa", "incidente"]:
-                    novos_dados[campo] = st.text_area(f"**{campo}**")
-                else:
-                    novos_dados[campo] = st.text_input(f"**{campo}**")
-            
-            # Botão de salvar dentro do formulário
-            submitted = st.form_submit_button("💾 Salvar Registro")
-
-            if submitted:
-                sucesso, erro_msg = adicionar_registro(caminho_arquivo, campos, novos_dados)
-                if sucesso:
-                    st.success(f"Registro adicionado com sucesso ao arquivo '{caminho_arquivo}'!")
-                    st.info("A página será atualizada para refletir os novos dados.")
-                    # Limpa o cache para que os dados sejam recarregados na próxima execução
-                    st.cache_data.clear()
-                    # Força a re-execução do script para atualizar a visualização
-                    st.experimental_rerun()
-                else:
-                    st.error(f"Falha ao salvar o registro: {erro_msg}")
+    
+    if not all_data:
+        st.error("A função de adicionar registro está desabilitada pois os arquivos de dados não puderam ser lidos.")
+    else:
+        st.info("Selecione o tipo de formulário, preencha os dados e clique em 'Salvar'.")
+        tipo_formulario = st.selectbox(
+            "Qual tipo de registro você deseja adicionar?",
+            options=list(CAMPOS_FORMULARIOS.keys())
+        )
+        if tipo_formulario:
+            info_form = CAMPOS_FORMULARIOS[tipo_formulario]
+            caminho_arquivo = info_form["arquivo"]
+            campos = info_form["campos"]
+            with st.form(key=f"form_{caminho_arquivo}", clear_on_submit=True):
+                st.subheader(f"Formulário: {tipo_formulario}")
+                novos_dados = {}
+                for campo in campos:
+                    if "Data/Hora" in campo:
+                        valor_padrao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                        novos_dados[campo] = st.text_input(f"**{campo}**", value=valor_padrao)
+                    elif campo.lower() in ["obs", "pontos importantes", "ponto importantes", "causa", "incidente"]:
+                        novos_dados[campo] = st.text_area(f"**{campo}**")
+                    else:
+                        novos_dados[campo] = st.text_input(f"**{campo}**")
+                
+                submitted = st.form_submit_button("💾 Salvar Registro")
+                if submitted:
+                    sucesso, erro_msg = adicionar_registro(caminho_arquivo, campos, novos_dados)
+                    if sucesso:
+                        st.success(f"Registro adicionado com sucesso ao arquivo '{caminho_arquivo}'!")
+                        st.info("A página será atualizada para refletir os novos dados.")
+                        st.cache_data.clear()
+                        # CORREÇÃO APLICADA: 'st.experimental_rerun()' foi atualizado para 'st.rerun()'.
+                        st.rerun() 
+                    else:
+                        st.error(f"Falha ao salvar o registro: {erro_msg}")
