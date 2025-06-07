@@ -49,12 +49,34 @@ def carregar_dados():
         st.info("Este erro ('File is not a zip file') geralmente acontece se o arquivo no GitHub estiver corrompido ou for um ponteiro do Git LFS. Por favor, tente baixar o arquivo do seu repositório e abri-lo localmente para verificar sua integridade.")
         return None
 
+def normalize_text(text):
+    """Remove caracteres especiais, espaços e converte para minúsculas."""
+    if text is None:
+        return ""
+    # Mantém apenas letras e números
+    return re.sub(r'[^a-zA-Z0-9]', '', str(text)).lower()
+
 def buscar_palavra(df, palavra):
-    """Busca uma palavra-chave como texto literal em todas as colunas de um DataFrame."""
+    """Busca uma palavra-chave de forma flexível, ignorando caracteres especiais e espaços."""
     if not palavra:
         return pd.DataFrame()
-    # CORREÇÃO: Adicionado regex=False para garantir uma busca literal, não por expressão regular.
-    mask = df.apply(lambda row: row.astype(str).str.contains(palavra, case=False, na=False, regex=False).any(), axis=1)
+
+    # Normaliza a palavra-chave digitada pelo usuário
+    palavra_normalizada = normalize_text(palavra)
+    if not palavra_normalizada:
+        return pd.DataFrame()
+
+    # Cria uma cópia do DataFrame para não modificar o original
+    df_normalizado = df.copy()
+
+    # Normaliza todas as colunas do DataFrame para a busca
+    for col in df_normalizado.columns:
+        df_normalizado[col] = df_normalizado[col].apply(normalize_text)
+
+    # Realiza a busca no DataFrame normalizado
+    mask = df_normalizado.apply(lambda row: row.str.contains(palavra_normalizada, na=False).any(), axis=1)
+    
+    # Retorna as linhas correspondentes do DataFrame ORIGINAL
     return df[mask]
 
 def destacar_palavra(val, palavra):
@@ -93,7 +115,9 @@ tab_busca, tab_adicionar = st.tabs(["🔍 Buscar Dados", "➕ Adicionar Novo Reg
 with tab_busca:
     st.header("Ferramenta de Busca Rápida")
     if all_data:
-        palavra = st.text_input("Digite uma palavra-chave para buscar em todas as bases:", placeholder="Ex: MPLS, Oi, Embratel, cancelado...")
+        # Dica para o usuário
+        palavra = st.text_input("Digite uma palavra-chave para buscar (ex: MPLS, Oi, cancelado):", placeholder="Não precisa usar [ ] ou ( )")
+        
         if palavra:
             st.markdown("---")
             datasets_map = {
