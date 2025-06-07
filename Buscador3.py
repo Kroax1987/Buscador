@@ -15,6 +15,7 @@ st.set_page_config(page_title="Buscador Inteligente", layout="wide")
 st.title("💡 Buscador e Editor de Dados Operacionais")
 
 # --- DEFINIÇÃO DOS CAMPOS PARA OS FORMULÁRIOS ---
+# MELHORIA: Corrigido "Ponto Importantes" para "Pontos Importantes" para consistência.
 CAMPOS_FORMULARIOS = {
     "Contatos das Operadoras": {
         "arquivo": FILE_OPERADORAS,
@@ -26,7 +27,7 @@ CAMPOS_FORMULARIOS = {
     },
     "Chamados de Operadoras": {
         "arquivo": FILE_CHAMADOS,
-        "campos": ["Analista", "Unidade", "Protocolo", "Incidente", "Causa", "Operadora", "Data/Hora de Abertura", "Data/Hora de Encerramento", "SLA", "Ponto Importantes"]
+        "campos": ["Analista", "Unidade", "Protocolo", "Incidente", "Causa", "Operadora", "Data/Hora de Abertura", "Data/Hora de Encerramento", "SLA", "Pontos Importantes"]
     }
 }
 
@@ -49,30 +50,44 @@ def carregar_dados():
         st.info("Este erro ('File is not a zip file') geralmente acontece se o arquivo no GitHub estiver corrompido ou for um ponteiro do Git LFS. Por favor, tente baixar o arquivo do seu repositório e abri-lo localmente para verificar sua integridade.")
         return None
 
+# CORREÇÃO CRÍTICA: A função original tinha erros de lógica e sintaxe que a impediam de funcionar.
 def buscar_palavra(df, palavra):
     """Busca uma palavra-chave de forma flexível e robusta, iterando coluna por coluna."""
+    # 1. Validação inicial
     if df is None or df.empty or not palavra:
         return pd.DataFrame()
-        palavra_normalizada = re.sub(r'[^a-zA-Z0-9]', '', str(palavra)).lower()
-        
+
+    # 2. Normalizar a palavra-chave de busca uma única vez
+    # Remove caracteres especiais e converte para minúsculas para uma busca mais flexível.
+    palavra_normalizada = re.sub(r'[^a-zA-Z0-9]', '', str(palavra)).lower()
+
+    # Se a palavra normalizada ficar vazia (ex: o usuário digitou apenas "[]"), não há o que buscar.
     if not palavra_normalizada:
         return pd.DataFrame()
-        palavra_normalizada = re.sub(r'[^a-zA-Z0-9]', '', str(palavra)).lower()
-        final_mask = pd.Series(False, index=df.index)
 
+    # 3. Criar uma máscara booleana para acumular os resultados
+    final_mask = pd.Series(False, index=df.index)
+
+    # 4. Iterar sobre cada coluna do DataFrame
     for col in df.columns:
         try:
+            # Normalizar a coluna inteira para o mesmo formato da palavra-chave
             col_normalizada = df[col].astype(str).str.replace(r'[^a-zA-Z0-9]', '', regex=True).str.lower()
+            # Verificar quais células da coluna contêm a palavra normalizada
             col_mask = col_normalizada.str.contains(palavra_normalizada, na=False)
+            # Acumular os resultados na máscara final (usando o operador OR `|`)
             final_mask = final_mask | col_mask
-        except:
+        except Exception:
+            # Ignora colunas que possam causar erro na conversão para string (raro, mas seguro)
             continue
             
+    # 5. Retornar as linhas do DataFrame original onde a máscara é True
     return df[final_mask]
 
 def destacar_palavra(val, palavra):
     """Função para aplicar estilo: destaca a palavra-chave encontrada em uma célula."""
     val_str = str(val)
+    # A busca com re.escape garante que caracteres especiais na palavra (como '+', '()') não quebrem o regex.
     if palavra and re.search(re.escape(palavra), val_str, re.IGNORECASE):
         return 'background-color: yellow; color: black;'
     return ''
@@ -83,8 +98,10 @@ def adicionar_registro(caminho_arquivo, campos, novos_dados):
         if os.path.exists(caminho_arquivo):
             df = pd.read_excel(caminho_arquivo, engine='openpyxl')
         else:
+            # Se o arquivo não existe, cria um DataFrame vazio com as colunas corretas.
             df = pd.DataFrame(columns=campos)
 
+        # Garante que todas as colunas do formulário existam no DataFrame.
         for col in campos:
             if col not in df.columns:
                 df[col] = None
@@ -105,15 +122,13 @@ tab_busca, tab_adicionar = st.tabs(["🔍 Buscar Dados", "➕ Adicionar Novo Reg
 with tab_busca:
     st.header("Ferramenta de Busca Rápida")
     if all_data:
-        # ---- LINHA DE DEPURAÇÃO ADICIONADA ----
-        # Isso mostrará a contagem de linhas para cada arquivo carregado.
+        # A barra lateral para depuração é uma ótima ideia!
         with st.sidebar:
             st.write("---")
             st.write("**Status dos Dados Carregados:**")
             for nome, df_info in all_data.items():
                 st.write(f"- `{nome}`: {len(df_info)} linhas")
             st.write("---")
-        # ---- FIM DA LINHA DE DEPURAÇÃO ----
 
         palavra = st.text_input("Digite uma palavra-chave para buscar (ex: MPLS, Oi, cancelado):", placeholder="Não é necessário usar [ ] ou ( )")
         
@@ -129,6 +144,7 @@ with tab_busca:
                     df = all_data[arquivo_nome]
                     resultados = buscar_palavra(df, palavra)
                     if not resultados.empty:
+                        # Usando 'styler' para aplicar o destaque
                         st.dataframe(
                             resultados.style.applymap(lambda val: destacar_palavra(val, palavra)),
                             use_container_width=True
@@ -160,7 +176,7 @@ with tab_adicionar:
                     if "Data/Hora" in campo:
                         valor_padrao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
                         novos_dados[campo] = st.text_input(f"**{campo}**", value=valor_padrao)
-                    elif campo.lower() in ["obs", "pontos importantes", "ponto importantes", "causa", "incidente"]:
+                    elif campo.lower() in ["obs", "pontos importantes", "causa", "incidente"]:
                         novos_dados[campo] = st.text_area(f"**{campo}**")
                     else:
                         novos_dados[campo] = st.text_input(f"**{campo}**")
@@ -170,8 +186,8 @@ with tab_adicionar:
                     sucesso, erro_msg = adicionar_registro(caminho_arquivo, campos, novos_dados)
                     if sucesso:
                         st.success(f"Registro adicionado com sucesso ao arquivo '{caminho_arquivo}'!")
-                        st.info("A página será atualizada para refletir os novos dados.")
-                        st.cache_data.clear()
-                        st.rerun() 
+                        st.info("Os dados serão atualizados em breve. A página será recarregada.")
+                        st.cache_data.clear() # Limpa o cache
+                        st.rerun() # Recarrega a página para refletir a mudança
                     else:
                         st.error(f"Falha ao salvar o registro: {erro_msg}")
