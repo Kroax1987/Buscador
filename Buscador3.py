@@ -54,7 +54,8 @@ def buscar_palavra(df, palavra):
     if df is None or df.empty or not palavra:
         return pd.DataFrame()
         palavra_normalizada = re.sub(r'[^a-zA-Z0-9]', '', str(palavra)).lower()
-        if not palavra_normalizada:
+        
+    if not palavra_normalizada:
         return pd.DataFrame()
         palavra_normalizada = re.sub(r'[^a-zA-Z0-9]', '', str(palavra)).lower()
         final_mask = pd.Series(False, index=df.index)
