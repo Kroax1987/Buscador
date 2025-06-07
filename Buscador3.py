@@ -49,35 +49,34 @@ def carregar_dados():
         st.info("Este erro ('File is not a zip file') geralmente acontece se o arquivo no GitHub estiver corrompido ou for um ponteiro do Git LFS. Por favor, tente baixar o arquivo do seu repositório e abri-lo localmente para verificar sua integridade.")
         return None
 
-def normalize_text(text):
-    """Remove caracteres especiais, espaços e converte para minúsculas."""
-    if text is None:
-        return ""
-    # Mantém apenas letras e números
-    return re.sub(r'[^a-zA-Z0-9]', '', str(text)).lower()
-
 def buscar_palavra(df, palavra):
-    """Busca uma palavra-chave de forma flexível, ignorando caracteres especiais e espaços."""
+    """Busca uma palavra-chave de forma flexível e robusta, iterando coluna por coluna."""
     if not palavra:
         return pd.DataFrame()
 
-    # Normaliza a palavra-chave digitada pelo usuário
-    palavra_normalizada = normalize_text(palavra)
+    # Normaliza a palavra-chave para a busca (remove caracteres especiais, espaços e converte para minúsculas)
+    palavra_normalizada = re.sub(r'[^a-zA-Z0-9]', '', str(palavra)).lower()
     if not palavra_normalizada:
         return pd.DataFrame()
 
-    # Cria uma cópia do DataFrame para não modificar o original
-    df_normalizado = df.copy()
+    # Cria uma máscara inicial, toda False, com o mesmo índice do DataFrame
+    final_mask = pd.Series(False, index=df.index)
 
-    # Normaliza todas as colunas do DataFrame para a busca
-    for col in df_normalizado.columns:
-        df_normalizado[col] = df_normalizado[col].apply(normalize_text)
+    # Itera sobre cada coluna do DataFrame
+    for col in df.columns:
+        # Garante que a coluna seja tratada como texto para a busca
+        # O na=False garante que células vazias (NaN) não causem erro e não sejam correspondidas
+        try:
+            col_normalizada = df[col].astype(str).str.replace(r'[^a-zA-Z0-9]', '', regex=True).str.lower()
+            col_mask = col_normalizada.str.contains(palavra_normalizada, na=False)
+            # Combina a máscara da coluna atual com a máscara final usando OU lógico
+            final_mask = final_mask | col_mask
+        except:
+            # Pula colunas que possam dar erro na conversão (improvável, mas seguro)
+            continue
 
-    # Realiza a busca no DataFrame normalizado
-    mask = df_normalizado.apply(lambda row: row.str.contains(palavra_normalizada, na=False).any(), axis=1)
-    
-    # Retorna as linhas correspondentes do DataFrame ORIGINAL
-    return df[mask]
+    # Retorna as linhas do DataFrame original onde a máscara final é True
+    return df[final_mask]
 
 def destacar_palavra(val, palavra):
     """Função para aplicar estilo: destaca a palavra-chave encontrada em uma célula."""
@@ -115,8 +114,7 @@ tab_busca, tab_adicionar = st.tabs(["🔍 Buscar Dados", "➕ Adicionar Novo Reg
 with tab_busca:
     st.header("Ferramenta de Busca Rápida")
     if all_data:
-        # Dica para o usuário
-        palavra = st.text_input("Digite uma palavra-chave para buscar (ex: MPLS, Oi, cancelado):", placeholder="Não precisa usar [ ] ou ( )")
+        palavra = st.text_input("Digite uma palavra-chave para buscar (ex: MPLS, Oi, cancelado):", placeholder="Não é necessário usar [ ] ou ( )")
         
         if palavra:
             st.markdown("---")
