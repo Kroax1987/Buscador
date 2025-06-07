@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import re # Importa o módulo de expressões regulares para o highlighting
 
-# --- CONFIGURAÇÕES E CONSTANTES ---
+# --- CONFIGURAções E CONSTANTES ---
 # Caminhos dos arquivos
 PATH_OPERADORAS = "Operadoras.xlsx"
 PATH_DESIGNACOES = "Circuitos e Designações.xlsx"
@@ -18,9 +18,10 @@ st.title("🔍 Buscador Inteligente de Dados Operacionais")
 def carregar_dados():
     """Carrega os dados dos arquivos Excel, retornando os DataFrames."""
     try:
-        operadoras_df = pd.read_excel(PATH_OPERADORAS)
-        designacoes_df = pd.read_excel(PATH_DESIGNACOES)
-        chamados_df = pd.read_excel(PATH_CHAMADOS)
+        # Especifica o engine 'openpyxl' para ler arquivos .xlsx
+        operadoras_df = pd.read_excel(PATH_OPERADORAS, engine='openpyxl')
+        designacoes_df = pd.read_excel(PATH_DESIGNACOES, engine='openpyxl')
+        chamados_df = pd.read_excel(PATH_CHAMADOS, engine='openpyxl')
         return operadoras_df, designacoes_df, chamados_df
     except FileNotFoundError:
         st.error(f"Erro: Um ou mais arquivos não foram encontrados. Verifique se os arquivos `{PATH_OPERADORAS}`, `{PATH_DESIGNACOES}` e `{PATH_CHAMADOS}` estão na mesma pasta que o script.")
@@ -85,4 +86,5 @@ if all(df is not None for df in [operadoras_df, designacoes_df, chamados_df]):
                 else:
                     st.info(f"Nenhum resultado encontrado para '{palavra}' nesta base de dados.")
 else:
+    # Esta mensagem só aparecerá se o carregamento de dados falhar
     st.warning("A aplicação não pode iniciar pois os arquivos de dados não foram carregados. Por favor, corrija o erro acima.")
