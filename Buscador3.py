@@ -5,16 +5,13 @@ import os
 from datetime import datetime
 
 # --- CONFIGURAÇÕES E CONSTANTES ---
-# Nomes dos arquivos
 FILE_OPERADORAS = "Operadoras.xlsx"
 FILE_DESIGNACOES = "Circuitos e Designações.xlsx"
 FILE_CHAMADOS = "Chamados Abertos Fechados.xlsx"
 
-# Configuração da página
 st.set_page_config(page_title="Buscador Inteligente", layout="wide")
 st.title("💡 Buscador e Editor de Dados Operacionais")
 
-# --- DEFINIÇÃO DOS CAMPOS PARA OS FORMULÁRIOS ---
 CAMPOS_FORMULARIOS = {
     "Contatos das Operadoras": {
         "arquivo": FILE_OPERADORAS,
@@ -34,69 +31,46 @@ CAMPOS_FORMULARIOS = {
 
 @st.cache_data
 def carregar_dados():
-    """Carrega os dados dos arquivos Excel. Retorna um dicionário de DataFrames."""
     dados = {}
-    try:
-        dados[FILE_OPERADORAS] = pd.read_excel(FILE_OPERADORAS, engine='openpyxl')
-        dados[FILE_DESIGNACOES] = pd.read_excel(FILE_DESIGNACOES, engine='openpyxl')
-        dados[FILE_CHAMADOS] = pd.read_excel(FILE_CHAMADOS, engine='openpyxl')
-        return dados
-    except FileNotFoundError as e:
-        st.error(f"Erro: Arquivo não encontrado - {e.filename}. Verifique se todos os arquivos Excel estão no repositório.")
-        return None
-    except Exception as e:
-        st.error(f"Erro inesperado ao carregar os arquivos: {e}")
-        st.info("Este erro ('File is not a zip file') geralmente acontece se o arquivo no GitHub estiver corrompido ou for um ponteiro do Git LFS. Por favor, tente baixar o arquivo do seu repositório e abri-lo localmente para verificar sua integridade.")
-        return None
+    arquivos = [FILE_OPERADORAS, FILE_DESIGNACOES, FILE_CHAMADOS]
+    for arquivo in arquivos:
+        if not os.path.exists(arquivo):
+            st.warning(f"⚠️ Arquivo não encontrado: `{arquivo}`.")
+            continue
+        try:
+            df = pd.read_excel(arquivo, engine='openpyxl')
+            dados[arquivo] = df
+        except Exception as e:
+            st.error(f"❌ Falha ao abrir `{arquivo}`: {e}")
+            st.info("Verifique se o arquivo está corrompido ou se é um arquivo válido do Excel (.xlsx).")
+    return dados if dados else None
 
 def buscar_palavra(df, palavra):
-    """Busca uma palavra-chave de forma robusta, ignorando colchetes, espaços e diferenças de caixa."""
     if not palavra:
         return pd.DataFrame()
 
-    # Normaliza a palavra-chave (remove símbolos e espaços)
-    palavra_normalizada = re.sub(r'[\W_]+', '', str(palavra)).lower()
+    palavra_normalizada = re.sub(r'[^a-zA-Z0-9]', '', str(palavra)).lower()
+    if not palavra_normalizada:
+        return pd.DataFrame()
 
     final_mask = pd.Series(False, index=df.index)
 
     for col in df.columns:
         try:
-            col_series = df[col].astype(str).fillna("").str.strip()
-            col_series = col_series.str.replace(r'[\W_]+', '', regex=True).str.lower()
-            col_mask = col_series.str.contains(palavra_normalizada, na=False)
-            final_mask = final_mask | col_mask
-        except:
-            continue
-
-    return df[final_mask]
-
-
-    # Itera sobre cada coluna do DataFrame
-    for col in df.columns:
-        # Garante que a coluna seja tratada como texto para a busca
-        # O na=False garante que células vazias (NaN) não causem erro e não sejam correspondidas
-        try:
             col_normalizada = df[col].astype(str).str.replace(r'[^a-zA-Z0-9]', '', regex=True).str.lower()
             col_mask = col_normalizada.str.contains(palavra_normalizada, na=False)
-            # Combina a máscara da coluna atual com a máscara final usando OU lógico
             final_mask = final_mask | col_mask
         except:
-            # Pula colunas que possam dar erro na conversão (improvável, mas seguro)
             continue
-
-    # Retorna as linhas do DataFrame original onde a máscara final é True
     return df[final_mask]
 
 def destacar_palavra(val, palavra):
-    """Função para aplicar estilo: destaca a palavra-chave encontrada em uma célula."""
     val_str = str(val)
-    # Usa re.escape para que a palavra-chave seja tratada literalmente na busca para destaque
     if palavra and re.search(re.escape(palavra), val_str, re.IGNORECASE):
         return 'background-color: yellow; color: black;'
     return ''
 
 def adicionar_registro(caminho_arquivo, campos, novos_dados):
-    """Lê um arquivo Excel, adiciona uma nova linha e o salva de volta."""
     try:
         if os.path.exists(caminho_arquivo):
             df = pd.read_excel(caminho_arquivo, engine='openpyxl')
@@ -114,7 +88,7 @@ def adicionar_registro(caminho_arquivo, campos, novos_dados):
     except Exception as e:
         return False, str(e)
 
-# --- LÓGICA PRINCIPAL DA APLICAÇÃO ---
+# --- EXECUÇÃO ---
 
 all_data = carregar_dados()
 
@@ -133,24 +107,27 @@ with tab_busca:
                 "📁 Resultados - Chamados": FILE_CHAMADOS
             }
             for titulo, arquivo_nome in datasets_map.items():
-                with st.expander(titulo, expanded=True):
-                    df = all_data[arquivo_nome]
-                    resultados = buscar_palavra(df, palavra)
-                    if not resultados.empty:
-                        st.dataframe(
-                            resultados.style.applymap(lambda val: destacar_palavra(val, palavra)),
-                            use_container_width=True
-                        )
-                    else:
-                        st.info(f"Nenhum resultado para '{palavra}' em {titulo.split(' - ')[1]}.")
+                if arquivo_nome in all_data:
+                    with st.expander(titulo, expanded=True):
+                        df = all_data[arquivo_nome]
+                        resultados = buscar_palavra(df, palavra)
+                        if not resultados.empty:
+                            st.dataframe(
+                                resultados.style.applymap(lambda val: destacar_palavra(val, palavra)),
+                                use_container_width=True
+                            )
+                        else:
+                            st.info(f"Nenhum resultado para '{palavra}' em {titulo.split(' - ')[1]}.")
+                else:
+                    st.warning(f"Arquivo {arquivo_nome} não carregado. Verifique sua integridade.")
     else:
-        st.warning("A busca está indisponível pois os arquivos de dados não foram carregados.")
+        st.warning("A busca está indisponível pois nenhum dado foi carregado com sucesso.")
 
 with tab_adicionar:
     st.header("Criar um Novo Registro")
     
     if not all_data:
-        st.error("A função de adicionar registro está desabilitada pois os arquivos de dados não puderam ser lidos.")
+        st.error("A função de adicionar está desabilitada pois os arquivos não foram carregados corretamente.")
     else:
         st.info("Selecione o tipo de formulário, preencha os dados e clique em 'Salvar'.")
         tipo_formulario = st.selectbox(
@@ -172,7 +149,7 @@ with tab_adicionar:
                         novos_dados[campo] = st.text_area(f"**{campo}**")
                     else:
                         novos_dados[campo] = st.text_input(f"**{campo}**")
-                
+
                 submitted = st.form_submit_button("💾 Salvar Registro")
                 if submitted:
                     sucesso, erro_msg = adicionar_registro(caminho_arquivo, campos, novos_dados)
@@ -180,6 +157,6 @@ with tab_adicionar:
                         st.success(f"Registro adicionado com sucesso ao arquivo '{caminho_arquivo}'!")
                         st.info("A página será atualizada para refletir os novos dados.")
                         st.cache_data.clear()
-                        st.rerun() 
+                        st.rerun()
                     else:
                         st.error(f"Falha ao salvar o registro: {erro_msg}")
