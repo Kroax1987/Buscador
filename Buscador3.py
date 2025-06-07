@@ -15,9 +15,9 @@ st.title("🔍 Buscador Inteligente de Dados Operacionais")
 @st.cache_data
 def carregar_dados():
     try:
-        operadoras_df = pd.read_excel(PATH_OPERADORAS)
-        designacoes_df = pd.read_excel(PATH_DESIGNACOES)
-        chamados_df = pd.read_excel(PATH_CHAMADOS)
+        operadoras_df = pd.read_excel(PATH, OPEN_EXECEL_OPERADORAS)
+        designacoes_df = pd.read_excel(PATH, OPEN_EXECEL_DESIGNACOES)
+        chamados_df = pd.read_excel(PATH, OPEN_EXECEL_CHAMADOS)
         return operadoras_df, designacoes_df, chamados_df
     except Exception as e:
         st.error(f"Erro ao carregar os arquivos: {e}")
