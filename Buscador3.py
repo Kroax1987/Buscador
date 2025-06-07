@@ -50,17 +50,26 @@ def carregar_dados():
         return None
 
 def buscar_palavra(df, palavra):
-    """Busca uma palavra-chave de forma flexível e robusta, iterando coluna por coluna."""
+    """Busca uma palavra-chave de forma robusta, ignorando colchetes, espaços e diferenças de caixa."""
     if not palavra:
         return pd.DataFrame()
 
-    # Normaliza a palavra-chave para a busca (remove caracteres especiais, espaços e converte para minúsculas)
-    palavra_normalizada = re.sub(r'[^a-zA-Z0-9]', '', str(palavra)).lower()
-    if not palavra_normalizada:
-        return pd.DataFrame()
+    # Normaliza a palavra-chave (remove símbolos e espaços)
+    palavra_normalizada = re.sub(r'[\W_]+', '', str(palavra)).lower()
 
-    # Cria uma máscara inicial, toda False, com o mesmo índice do DataFrame
     final_mask = pd.Series(False, index=df.index)
+
+    for col in df.columns:
+        try:
+            col_series = df[col].astype(str).fillna("").str.strip()
+            col_series = col_series.str.replace(r'[\W_]+', '', regex=True).str.lower()
+            col_mask = col_series.str.contains(palavra_normalizada, na=False)
+            final_mask = final_mask | col_mask
+        except:
+            continue
+
+    return df[final_mask]
+
 
     # Itera sobre cada coluna do DataFrame
     for col in df.columns:
