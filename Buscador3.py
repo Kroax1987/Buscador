@@ -53,12 +53,11 @@ def buscar_palavra(df, palavra):
     """Busca uma palavra-chave de forma flexível e robusta, iterando coluna por coluna."""
     if df is None or df.empty or not palavra:
         return pd.DataFrame()
-
-    palavra_normalizada = re.sub(r'[^a-zA-Z0-9]', '', str(palavra)).lower()
-    if not palavra_normalizada:
+        palavra_normalizada = re.sub(r'[^a-zA-Z0-9]', '', str(palavra)).lower()
+        if not palavra_normalizada:
         return pd.DataFrame()
-    palavra_normalizada = re.sub(r'[^a-zA-Z0-9]', '', str(palavra)).lower()
-    final_mask = pd.Series(False, index=df.index)
+        palavra_normalizada = re.sub(r'[^a-zA-Z0-9]', '', str(palavra)).lower()
+        final_mask = pd.Series(False, index=df.index)
 
     for col in df.columns:
         try:
