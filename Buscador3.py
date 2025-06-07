@@ -2,58 +2,58 @@ import streamlit as st
 import pandas as pd
 import os
 
-# Caminhos dos arquivos dentro da pasta data/
+# Caminhos dos arquivos
 PATH_OPERADORAS = "Operadoras.xlsx"
-PATH_DESIGNACOES = "Circuitos_e_Designacoes.xlsx"
-PATH_CHAMADOS = "Chamados_Operadoras.xlsx"
+PATH_DESIGNACOES = "Circuitos e Designações.xlsx"
+PATH_CHAMADOS = "Chamados Abertos Fechados.xlsx"
 
+# Configuração da página
 st.set_page_config(page_title="Buscador Inteligente", layout="wide")
-
 st.title("🔍 Buscador Inteligente de Dados Operacionais")
 
-# Função para carregar as planilhas
+# Função para carregar os dados
 @st.cache_data
 def carregar_dados():
     try:
-        operadores_df = pd.read_excel(PATH_OPERADORAS)
+        operadoras_df = pd.read_excel(PATH_OPERADORAS)
         designacoes_df = pd.read_excel(PATH_DESIGNACOES)
         chamados_df = pd.read_excel(PATH_CHAMADOS)
-        return operadores_df, designacoes_df, chamados_df
+        return operadoras_df, designacoes_df, chamados_df
     except Exception as e:
         st.error(f"Erro ao carregar os arquivos: {e}")
         return None, None, None
 
-# Função para buscar dados em uma planilha por palavra-chave
-def buscar_palavra_chave(df, palavra):
-    if df is None or df.empty:
-        return pd.DataFrame()
-    resultados = df[df.apply(lambda row: row.astype(str).str.contains(palavra, case=False, na=False).any(), axis=1)]
-    return resultados
+# Função de busca dinâmica
+def buscar_palavra(df, palavra):
+    if palavra:
+        resultados = df[df.apply(lambda row: row.astype(str).str.contains(palavra, case=False, na=False).any(), axis=1)]
+        return resultados.head(3)  # Mostra no máximo 3 resultados
+    return pd.DataFrame()
 
-# Carregar dados
+# Carrega os dados
 operadoras_df, designacoes_df, chamados_df = carregar_dados()
 
-# Interface
+# Input da palavra-chave
 palavra = st.text_input("Digite uma palavra-chave para buscar:")
 
-if palavra:
-    with st.spinner("Buscando..."):
+if palavra and all([operadoras_df is not None, designacoes_df is not None, chamados_df is not None]):
+    with st.expander("🔌 Resultados - Operadoras", expanded=True):
+        resultados_operadoras = buscar_palavra(operadoras_df, palavra)
+        if not resultados_operadoras.empty:
+            st.dataframe(resultados_operadoras)
+        else:
+            st.info("Nenhum resultado encontrado em Operadoras.")
 
-        st.subheader("🔌 Resultado: Operadoras")
-        resultado_operadoras = buscar_palavra_chave(operadoras_df, palavra)
-        st.dataframe(resultado_operadoras, use_container_width=True)
+    with st.expander("📡 Resultados - Circuitos e Designações", expanded=True):
+        resultados_designacoes = buscar_palavra(designacoes_df, palavra)
+        if not resultados_designacoes.empty:
+            st.dataframe(resultados_designacoes)
+        else:
+            st.info("Nenhum resultado encontrado em Circuitos e Designações.")
 
-        st.subheader("🧩 Resultado: Circuitos e Designações")
-        resultado_designacoes = buscar_palavra_chave(designacoes_df, palavra)
-        st.dataframe(resultado_designacoes, use_container_width=True)
-
-        st.subheader("📑 Resultado: Chamados Abertos / Fechados")
-        resultado_chamados = buscar_palavra_chave(chamados_df, palavra)
-        st.dataframe(resultado_chamados, use_container_width=True)
-
-        if (
-            resultado_operadoras.empty and
-            resultado_designacoes.empty and
-            resultado_chamados.empty
-        ):
-            st.warning("🔎 Nenhum resultado encontrado.")
+    with st.expander("📁 Resultados - Chamados", expanded=True):
+        resultados_chamados = buscar_palavra(chamados_df, palavra)
+        if not resultados_chamados.empty:
+            st.dataframe(resultados_chamados)
+        else:
+            st.info("Nenhum resultado encontrado em Chamados.")
