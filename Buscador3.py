@@ -1,153 +1,102 @@
 import streamlit as st
 import pandas as pd
-import re
-import os
 import json
+import os
 from datetime import datetime
 
-# --- CONFIGURAÇÕES INICIAIS ---
-FILE_OPERADORAS = "Operadoras.xlsx"
-FILE_DESIGNACOES = "Circuitos e Designações.xlsx"
-FILE_CHAMADOS = "Chamados Abertos Fechados.xlsx"
-FILE_USUARIOS = "usuarios.json"
+st.set_page_config(page_title="Clima Real por Usuários", layout="centered")
 
-st.set_page_config(page_title="Buscador Inteligente", layout="wide")
+USERS_FILE = "usuarios_clima.json"
+POSTS_FILE = "relatos_climaticos.csv"
 
-# --- AUTENTICAÇÃO ---
+# ---------------------- Funções de Usuário ----------------------
 def carregar_usuarios():
-    if os.path.exists(FILE_USUARIOS):
-        with open(FILE_USUARIOS, "r") as f:
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, "r") as f:
             return json.load(f)
     return {}
 
-def salvar_usuarios(dados):
-    with open(FILE_USUARIOS, "w") as f:
-        json.dump(dados, f)
+def salvar_usuarios(usuarios):
+    with open(USERS_FILE, "w") as f:
+        json.dump(usuarios, f)
 
+# ---------------------- Login/Cadastro ----------------------
 def login():
-    st.title("🔐 Login")
-    tab_login, tab_criar = st.tabs(["Entrar", "Criar Usuário"])
-    with tab_login:
+    st.title("☁️ Clima Real por Usuários")
+    aba_login, aba_cadastro = st.tabs(["Entrar", "Criar Conta"])
+
+    with aba_login:
         username = st.text_input("Usuário")
         senha = st.text_input("Senha", type="password")
         if st.button("Entrar"):
             usuarios = carregar_usuarios()
             if username in usuarios and usuarios[username] == senha:
-                st.session_state["usuario"] = username
+                st.session_state.usuario = username
                 st.rerun()
             else:
-                st.error("Usuário ou senha incorretos.")
+                st.error("Usuário ou senha inválidos.")
 
-    with tab_criar:
-        novo_user = st.text_input("Novo usuário")
+    with aba_cadastro:
+        novo_usuario = st.text_input("Novo usuário")
         nova_senha = st.text_input("Nova senha", type="password")
-        if st.button("Criar usuário"):
+        if st.button("Cadastrar"):
             usuarios = carregar_usuarios()
-            if novo_user in usuarios:
+            if novo_usuario in usuarios:
                 st.warning("Usuário já existe.")
             else:
-                usuarios[novo_user] = nova_senha
+                usuarios[novo_usuario] = nova_senha
                 salvar_usuarios(usuarios)
-                st.success("Usuário criado com sucesso.")
+                st.success("Usuário cadastrado com sucesso! Volte para Entrar.")
 
 if "usuario" not in st.session_state:
     login()
     st.stop()
 
-# --- FUNÇÕES DE BUSCA E EDIÇÃO ---
-@st.cache_data
-def carregar_dados():
-    dados = {}
-    try:
-        dados[FILE_OPERADORAS] = pd.read_excel(FILE_OPERADORAS, engine='openpyxl')
-        dados[FILE_DESIGNACOES] = pd.read_excel(FILE_DESIGNACOES, engine='openpyxl')
-        dados[FILE_CHAMADOS] = pd.read_excel(FILE_CHAMADOS, engine='openpyxl')
-        return dados
-    except Exception as e:
-        st.error(f"Erro ao carregar arquivos: {e}")
-        return None
+# ---------------------- Postagens ----------------------
+def carregar_posts():
+    if os.path.exists(POSTS_FILE):
+        return pd.read_csv(POSTS_FILE)
+    return pd.DataFrame(columns=["usuario", "data_hora", "cidade", "descricao"])
 
-def adicionar_registro(caminho, campos, dados):
-    try:
-        df = pd.read_excel(caminho, engine='openpyxl') if os.path.exists(caminho) else pd.DataFrame(columns=campos)
-        for col in campos:
-            if col not in df.columns:
-                df[col] = None
-        nova_linha = pd.DataFrame([dados])
-        df = pd.concat([df, nova_linha], ignore_index=True)
-        df.to_excel(caminho, index=False, engine='openpyxl')
-        return True, None
-    except Exception as e:
-        return False, str(e)
+def salvar_post(post):
+    df = carregar_posts()
+    df = pd.concat([df, pd.DataFrame([post])], ignore_index=True)
+    df.to_csv(POSTS_FILE, index=False)
 
-# --- LÓGICA PRINCIPAL ---
-all_data = carregar_dados()
-st.title("💡 Buscador e Editor de Dados Operacionais")
-tab_busca, tab_adicionar = st.tabs(["🔍 Buscar Dados", "➕ Adicionar Registro"])
+# ---------------------- Interface Principal ----------------------
+st.title("📍 Relatos do Clima em Tempo Real")
 
-with tab_adicionar:
-    st.header("Novo Registro")
-    CAMPOS = {
-        "Chamados de Operadoras": {
-            "arquivo": FILE_CHAMADOS,
-            "campos": [
-                "Analista", "Unidade", "Protocolo", "Incidente", "Causa",
-                "Operadora", "Data/Hora de Abertura", "Data/Hora de Encerramento",
-                "SLA", "Ultimos Status", "Prox. Status"
-            ]
-        }
-    }
+aba_feed, aba_novo = st.tabs(["🌦️ Feed", "➕ Novo Relato"])
 
-    tipo = st.selectbox("Tipo de Registro", list(CAMPOS.keys()))
-    info = CAMPOS[tipo]
-    arquivo = info["arquivo"]
-    campos = info["campos"]
+with aba_feed:
+    st.subheader("🔎 Veja relatos de outras pessoas")
+    posts = carregar_posts()
+    filtro_cidade = st.text_input("Filtrar por cidade:")
+    if filtro_cidade:
+        posts = posts[posts["cidade"].str.contains(filtro_cidade, case=False)]
 
-    with st.form(f"form_{arquivo}"):
-        st.subheader(tipo)
-        dados = {}
-        for campo in campos:
-            if campo == "Analista":
-                dados[campo] = st.session_state["usuario"]
-            elif campo == "Incidente":
-                dados[campo] = st.text_input(campo, placeholder="INC1234567")
-            elif campo == "Causa":
-                dados[campo] = st.selectbox(campo, ["Falha Massiva", "Rompimento de Fibra", "Perca de Pacote", "Alta Latencia", "Falha no Equipamento"])
-            elif campo.startswith("Data/Hora"):
-                dados[campo] = st.date_input(campo).strftime("%d/%m/%Y") + " " + st.time_input(campo).strftime("%H:%M:%S")
-            elif campo == "SLA":
-                sla = st.radio("SLA Atendido?", ["Sim", "Não"], horizontal=True)
-                cor = "#ff4b4b" if sla == "Sim" else "#2ecc71"
-                st.markdown(f"<span style='color: {cor}; font-weight: bold;'>SLA: {sla}</span>", unsafe_allow_html=True)
-                dados[campo] = sla
-            elif campo == "Ultimos Status" or campo == "Prox. Status":
-                dados[campo] = st.text_area(campo)
-            else:
-                dados[campo] = st.text_input(campo)
+    posts = posts.sort_values("data_hora", ascending=False)
+    for _, row in posts.iterrows():
+        with st.container():
+            st.markdown(f"**📍 {row['cidade']}**")
+            st.markdown(f"🗓️ {row['data_hora']}")
+            st.markdown(f"🧑 {row['usuario']}")
+            st.info(row["descricao"])
 
-        submit = st.form_submit_button("📂 Salvar Registro")
-
-    if submit:
-        sucesso, erro = adicionar_registro(arquivo, campos, dados)
-        if sucesso:
-            st.success("Registro salvo com sucesso!")
-            isolada = "NÃO" if "isol" not in dados["Causa"].lower() else "SIM"
-            msg = f"""
-Boa tarde, aqui é o analista *{dados['Analista']}* Segue o caso abaixo para informação:
-
-*Unidade:* {dados['Unidade']}
-*Unidade Isolada:* {isolada}
-*Chamado Service Now⚠️:* {dados['Incidente']}
-*Operadora:* {dados['Operadora']}
-*Chamado Operadora:* {dados['Protocolo']}
-
-*Último Status*: {dados['Ultimos Status']}
-
-*Próx. Status:* {dados['Prox. Status']}
-"""
-            st.markdown("---")
-            st.subheader("📤 Copie e cole no WhatsApp:")
-            st.code(msg.strip(), language="markdown")
-            st.balloons()
+with aba_novo:
+    st.subheader("📤 Compartilhe como está o clima agora")
+    cidade = st.text_input("Cidade")
+    descricao = st.text_area("Descreva o clima agora (Ex: Chuva fraca, muito sol, ventania, etc.)")
+    if st.button("Enviar Relato"):
+        if cidade and descricao:
+            post = {
+                "usuario": st.session_state.usuario,
+                "data_hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "cidade": cidade,
+                "descricao": descricao
+            }
+            salvar_post(post)
+            st.success("Relato enviado!")
+            st.rerun()
         else:
-            st.error(f"Erro ao salvar: {erro}")
+            st.error("Preencha todos os campos para enviar.")
