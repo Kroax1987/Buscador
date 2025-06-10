@@ -108,7 +108,7 @@ with tab_busca:
     if palavra and all_data:
         for titulo, arquivo in {
             "🔌 Operadoras": FILE_OPERADORAS,
-            "📡 Designações": FILE_DESIGNACOES,
+            "🚱 Designações": FILE_DESIGNACOES,
             "📁 Chamados": FILE_CHAMADOS
         }.items():
             with st.expander(titulo, expanded=True):
@@ -145,13 +145,13 @@ with tab_adicionar:
                 dados[campo] = st.session_state["usuario"]
             else:
                 dados[campo] = st.text_input(campo)
-        submit = st.form_submit_button("💾 Salvar Registro")
+        submit = st.form_submit_button("📋 Salvar Registro")
 
     if submit:
         sucesso, erro = adicionar_registro(arquivo, campos, dados)
         if sucesso:
             st.success("Registro salvo com sucesso!")
-            # Geração da mensagem para WhatsApp
+
             encerramento = dados["Data/Hora de Encerramento"]
             isolada = "SIM" if "isol" in dados["Causa"].lower() else "NÃO"
             msg = f"""
@@ -167,7 +167,7 @@ Chamado Operadora: {dados['Protocolo']}
 Encerramento ✅: {encerramento}
 """
             st.markdown("---")
-            st.subheader("📤 Copie e cole no WhatsApp:")
+            st.subheader("📤 Mensagem pronta para WhatsApp:")
             st.code(msg.strip(), language="markdown")
             st.balloons()
         else:
