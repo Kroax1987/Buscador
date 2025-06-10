@@ -67,23 +67,6 @@ def carregar_dados():
         st.error(f"Erro ao carregar arquivos: {e}")
         return None
 
-def buscar_palavra(df, palavra):
-    if df is None or df.empty or not palavra:
-        return pd.DataFrame()
-    termo = str(palavra).lower()
-    mascara = pd.Series(False, index=df.index)
-    for col in df.columns:
-        try:
-            mascara |= df[col].astype(str).str.lower().str.contains(termo, na=False)
-        except Exception:
-            continue
-    return df[mascara]
-
-def destacar_palavra(val, palavra):
-    if palavra and re.search(re.escape(palavra), str(val), re.IGNORECASE):
-        return 'background-color: yellow; color: black;'
-    return ''
-
 def adicionar_registro(caminho, campos, dados):
     try:
         df = pd.read_excel(caminho, engine='openpyxl') if os.path.exists(caminho) else pd.DataFrame(columns=campos)
@@ -102,29 +85,16 @@ all_data = carregar_dados()
 st.title("💡 Buscador e Editor de Dados Operacionais")
 tab_busca, tab_adicionar = st.tabs(["🔍 Buscar Dados", "➕ Adicionar Registro"])
 
-with tab_busca:
-    st.header("Busca Rápida")
-    palavra = st.text_input("Palavra-chave:")
-    if palavra and all_data:
-        for titulo, arquivo in {
-            "🔌 Operadoras": FILE_OPERADORAS,
-            "🚱 Designações": FILE_DESIGNACOES,
-            "📁 Chamados": FILE_CHAMADOS
-        }.items():
-            with st.expander(titulo, expanded=True):
-                df = all_data[arquivo]
-                res = buscar_palavra(df, palavra)
-                if not res.empty:
-                    st.dataframe(res.style.applymap(lambda val: destacar_palavra(val, palavra)), use_container_width=True)
-                else:
-                    st.info("Nenhum resultado encontrado.")
-
 with tab_adicionar:
     st.header("Novo Registro")
     CAMPOS = {
         "Chamados de Operadoras": {
             "arquivo": FILE_CHAMADOS,
-            "campos": ["Analista", "Unidade", "Protocolo", "Incidente", "Causa", "Operadora", "Data/Hora de Abertura", "Data/Hora de Encerramento", "SLA", "Pontos Importantes"]
+            "campos": [
+                "Analista", "Unidade", "Protocolo", "Incidente", "Causa",
+                "Operadora", "Data/Hora de Abertura", "Data/Hora de Encerramento",
+                "SLA", "Ultimos Status", "Prox. Status"
+            ]
         }
     }
 
@@ -137,37 +107,46 @@ with tab_adicionar:
         st.subheader(tipo)
         dados = {}
         for campo in campos:
-            if "Data/Hora" in campo:
-                dados[campo] = st.text_input(campo, value=datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-            elif campo.lower() in ["obs", "pontos importantes", "causa", "incidente"]:
-                dados[campo] = st.text_area(campo)
-            elif campo == "Analista":
+            if campo == "Analista":
                 dados[campo] = st.session_state["usuario"]
+            elif campo == "Incidente":
+                dados[campo] = st.text_input(campo, placeholder="INC1234567")
+            elif campo == "Causa":
+                dados[campo] = st.selectbox(campo, ["Falha Massiva", "Rompimento de Fibra", "Perca de Pacote", "Alta Latencia", "Falha no Equipamento"])
+            elif campo.startswith("Data/Hora"):
+                dados[campo] = st.date_input(campo).strftime("%d/%m/%Y") + " " + st.time_input(campo).strftime("%H:%M:%S")
+            elif campo == "SLA":
+                sla = st.radio("SLA Atendido?", ["Sim", "Não"], horizontal=True)
+                cor = "#ff4b4b" if sla == "Sim" else "#2ecc71"
+                st.markdown(f"<span style='color: {cor}; font-weight: bold;'>SLA: {sla}</span>", unsafe_allow_html=True)
+                dados[campo] = sla
+            elif campo == "Ultimos Status" or campo == "Prox. Status":
+                dados[campo] = st.text_area(campo)
             else:
                 dados[campo] = st.text_input(campo)
-        submit = st.form_submit_button("📋 Salvar Registro")
+
+        submit = st.form_submit_button("📂 Salvar Registro")
 
     if submit:
         sucesso, erro = adicionar_registro(arquivo, campos, dados)
         if sucesso:
             st.success("Registro salvo com sucesso!")
-
-            encerramento = dados["Data/Hora de Encerramento"]
-            isolada = "SIM" if "isol" in dados["Causa"].lower() else "NÃO"
+            isolada = "NÃO" if "isol" not in dados["Causa"].lower() else "SIM"
             msg = f"""
-Bom dia, aqui é o analista *{dados['Analista']}*. Segue o caso abaixo para informação:
+Boa tarde, aqui é o analista *{dados['Analista']}* Segue o caso abaixo para informação:
 
-Unidade: *{dados['Unidade']}* 📶  
-Unidade Isolada: {isolada}  
-Chamado Service No ⚠️: {dados['Incidente']}  
-Operadora: {dados['Operadora']}  
-Chamado Operadora: {dados['Protocolo']}
+*Unidade:* {dados['Unidade']}
+*Unidade Isolada:* {isolada}
+*Chamado Service Now⚠️:* {dados['Incidente']}
+*Operadora:* {dados['Operadora']}
+*Chamado Operadora:* {dados['Protocolo']}
 
-Último Status: {dados['Pontos Importantes']}  
-Encerramento ✅: {encerramento}
+*Último Status*: {dados['Ultimos Status']}
+
+*Próx. Status:* {dados['Prox. Status']}
 """
             st.markdown("---")
-            st.subheader("📤 Mensagem pronta para WhatsApp:")
+            st.subheader("📤 Copie e cole no WhatsApp:")
             st.code(msg.strip(), language="markdown")
             st.balloons()
         else:
