@@ -26,29 +26,32 @@ def salvar_usuarios(dados):
 
 def login():
     st.title("🔐 Login")
-    tab_login, tab_criar = st.tabs(["Entrar", "Criar Usuário"])
-    with tab_login:
-        username = st.text_input("Usuário")
-        senha = st.text_input("Senha", type="password")
-        if st.button("Entrar"):
-            usuarios = carregar_usuarios()
-            if username in usuarios and usuarios[username] == senha:
-                st.session_state["usuario"] = username
-                st.rerun()
-            else:
-                st.error("Usuário ou senha incorretos.")
+    with st.container():
+        col1, col2, col3 = st.columns([1,2,1])
+        with col2:
+            tab_login, tab_criar = st.tabs(["Entrar", "Criar Usuário"])
+            with tab_login:
+                username = st.text_input("Usuário")
+                senha = st.text_input("Senha", type="password")
+                if st.button("Entrar"):
+                    usuarios = carregar_usuarios()
+                    if username in usuarios and usuarios[username] == senha:
+                        st.session_state["usuario"] = username
+                        st.rerun()
+                    else:
+                        st.error("Usuário ou senha incorretos.")
 
-    with tab_criar:
-        novo_user = st.text_input("Novo usuário")
-        nova_senha = st.text_input("Nova senha", type="password")
-        if st.button("Criar usuário"):
-            usuarios = carregar_usuarios()
-            if novo_user in usuarios:
-                st.warning("Usuário já existe.")
-            else:
-                usuarios[novo_user] = nova_senha
-                salvar_usuarios(usuarios)
-                st.success("Usuário criado com sucesso.")
+            with tab_criar:
+                novo_user = st.text_input("Novo usuário")
+                nova_senha = st.text_input("Nova senha", type="password")
+                if st.button("Criar usuário"):
+                    usuarios = carregar_usuarios()
+                    if novo_user in usuarios:
+                        st.warning("Usuário já existe.")
+                    else:
+                        usuarios[novo_user] = nova_senha
+                        salvar_usuarios(usuarios)
+                        st.success("Usuário criado com sucesso.")
 
 if "usuario" not in st.session_state:
     login()
@@ -84,6 +87,18 @@ def adicionar_registro(caminho, campos, dados):
 all_data = carregar_dados()
 st.title("💡 Buscador e Editor de Dados Operacionais")
 tab_busca, tab_adicionar = st.tabs(["🔍 Buscar Dados", "➕ Adicionar Registro"])
+
+with tab_busca:
+    st.header("Buscar por Palavra-chave")
+    termo = st.text_input("Digite o termo de busca")
+    if termo:
+        resultados = []
+        for nome, df in all_data.items():
+            if df is not None:
+                encontrados = df[df.apply(lambda row: row.astype(str).str.contains(termo, case=False, na=False).any(), axis=1)]
+                if not encontrados.empty:
+                    st.subheader(f"📄 Resultados em: {nome}")
+                    st.dataframe(encontrados)
 
 with tab_adicionar:
     st.header("Novo Registro")
