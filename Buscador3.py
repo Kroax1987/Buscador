@@ -26,41 +26,32 @@ def salvar_usuarios(dados):
 
 def login():
     st.title("🔐 Login")
-    tab_login, tab_criar, tab_admin = st.tabs(["Entrar", "Criar Usuário", "Administração"])
-    with tab_login:
-        username = st.text_input("Usuário")
-        senha = st.text_input("Senha", type="password")
-        if st.button("Entrar"):
-            usuarios = carregar_usuarios()
-            if username in usuarios and usuarios[username] == senha:
-                st.session_state["usuario"] = username
-                st.rerun()
-            else:
-                st.error("Usuário ou senha incorretos.")
+    with st.container():
+        col1, col2, col3 = st.columns([1,2,1])
+        with col2:
+            tab_login, tab_criar = st.tabs(["Entrar", "Criar Usuário"])
+            with tab_login:
+                username = st.text_input("Usuário")
+                senha = st.text_input("Senha", type="password")
+                if st.button("Entrar"):
+                    usuarios = carregar_usuarios()
+                    if username in usuarios and usuarios[username] == senha:
+                        st.session_state["usuario"] = username
+                        st.rerun()
+                    else:
+                        st.error("Usuário ou senha incorretos.")
 
-    with tab_criar:
-        novo_user = st.text_input("Novo usuário")
-        nova_senha = st.text_input("Nova senha", type="password")
-        if st.button("Criar usuário"):
-            usuarios = carregar_usuarios()
-            if novo_user in usuarios:
-                st.warning("Usuário já existe.")
-            else:
-                usuarios[novo_user] = nova_senha
-                salvar_usuarios(usuarios)
-                st.success("Usuário criado com sucesso.")
-
-    with tab_admin:
-        usuarios = carregar_usuarios()
-        st.write("Usuários cadastrados:")
-        for user in usuarios:
-            col1, col2 = st.columns([3,1])
-            col1.write(user)
-            if col2.button("Remover", key=user):
-                usuarios.pop(user)
-                salvar_usuarios(usuarios)
-                st.success(f"Usuário '{user}' removido.")
-                st.rerun()
+            with tab_criar:
+                novo_user = st.text_input("Novo usuário")
+                nova_senha = st.text_input("Nova senha", type="password")
+                if st.button("Criar usuário"):
+                    usuarios = carregar_usuarios()
+                    if novo_user in usuarios:
+                        st.warning("Usuário já existe.")
+                    else:
+                        usuarios[novo_user] = nova_senha
+                        salvar_usuarios(usuarios)
+                        st.success("Usuário criado com sucesso.")
 
 if "usuario" not in st.session_state:
     login()
@@ -97,29 +88,6 @@ all_data = carregar_dados()
 st.title("💡 Buscador e Editor de Dados Operacionais")
 tab_busca, tab_adicionar = st.tabs(["🔍 Buscar Dados", "➕ Adicionar Registro"])
 
-# --- ABA DE BUSCA ---
-with tab_busca:
-    st.header("Busca por Palavra-chave")
-    palavra = st.text_input("Digite uma palavra-chave para buscar nas planilhas:")
-    filtro_data = st.date_input("Filtrar por Data (Chamados)", [], format="DD/MM/YYYY")
-    filtro_analista = st.text_input("Filtrar por Analista (Chamados):")
-    filtro_operadora = st.text_input("Filtrar por Operadora:")
-
-    if st.button("🔍 Buscar") and palavra:
-        for nome_arquivo, df in all_data.items():
-            st.subheader(f"📄 Resultados em {nome_arquivo}:")
-            df_temp = df.copy()
-            if filtro_operadora:
-                df_temp = df_temp[df_temp.apply(lambda row: filtro_operadora.lower() in str(row).lower(), axis=1)]
-            if filtro_analista and "Analista" in df_temp.columns:
-                df_temp = df_temp[df_temp["Analista"].str.contains(filtro_analista, case=False, na=False)]
-            if filtro_data and "Data/Hora de Abertura" in df_temp.columns:
-                datas = pd.to_datetime(df_temp["Data/Hora de Abertura"], errors='coerce')
-                df_temp = df_temp[(datas.dt.date >= filtro_data[0]) & (datas.dt.date <= filtro_data[-1])]
-            resultados = df_temp[df_temp.apply(lambda row: palavra.lower() in str(row).lower(), axis=1)]
-            st.write(resultados if not resultados.empty else "Nenhum resultado encontrado.")
-
-# --- ABA DE ADIÇÃO ---
 with tab_adicionar:
     st.header("Novo Registro")
     CAMPOS = {
@@ -166,9 +134,9 @@ with tab_adicionar:
         sucesso, erro = adicionar_registro(arquivo, campos, dados)
         if sucesso:
             st.success("Registro salvo com sucesso!")
-            isolada = "NÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃ¬ÃÂÃÃÂÃÂ¢ÃÂÃ¬ÃÂÃNÃÂÃÂ£O" if "isol" not in dados["Causa"].lower() else "SIM"
+            isolada = "NÃO" if "isol" not in dados["Causa"].lower() else "SIM"
             msg = f"""
-Boa tarde, aqui ÃÂ© o analista *{dados['Analista']}* Segue o caso abaixo para informaÃ§Ã£o:
+Boa tarde, aqui é o analista *{dados['Analista']}* Segue o caso abaixo para informação:
 
 *Unidade:* {dados['Unidade']}
 *Unidade Isolada:* {isolada}
@@ -176,9 +144,9 @@ Boa tarde, aqui ÃÂ© o analista *{dados['Analista']}* Segue o caso abaixo para
 *Operadora:* {dados['Operadora']}
 *Chamado Operadora:* {dados['Protocolo']}
 
-*Ãltimo Status*: {dados['Ultimos Status']}
+*Último Status*: {dados['Ultimos Status']}
 
-*PrÃ³x. Status:* {dados['Prox. Status']}
+*Próx. Status:* {dados['Prox. Status']}
 """
             st.markdown("---")
             st.subheader("📤 Copie e cole no WhatsApp:")
