@@ -26,32 +26,29 @@ def salvar_usuarios(dados):
 
 def login():
     st.title("🔐 Login")
-    with st.container():
-        col1, col2, col3 = st.columns([1,2,1])
-        with col2:
-            tab_login, tab_criar = st.tabs(["Entrar", "Criar Usuário"])
-            with tab_login:
-                username = st.text_input("Usuário")
-                senha = st.text_input("Senha", type="password")
-                if st.button("Entrar"):
-                    usuarios = carregar_usuarios()
-                    if username in usuarios and usuarios[username] == senha:
-                        st.session_state["usuario"] = username
-                        st.rerun()
-                    else:
-                        st.error("Usuário ou senha incorretos.")
+    tab_login, tab_criar = st.tabs(["Entrar", "Criar Usuário"])
+    with tab_login:
+        username = st.text_input("Usuário")
+        senha = st.text_input("Senha", type="password")
+        if st.button("Entrar"):
+            usuarios = carregar_usuarios()
+            if username in usuarios and usuarios[username] == senha:
+                st.session_state["usuario"] = username
+                st.rerun()
+            else:
+                st.error("Usuário ou senha incorretos.")
 
-            with tab_criar:
-                novo_user = st.text_input("Novo usuário")
-                nova_senha = st.text_input("Nova senha", type="password")
-                if st.button("Criar usuário"):
-                    usuarios = carregar_usuarios()
-                    if novo_user in usuarios:
-                        st.warning("Usuário já existe.")
-                    else:
-                        usuarios[novo_user] = nova_senha
-                        salvar_usuarios(usuarios)
-                        st.success("Usuário criado com sucesso.")
+    with tab_criar:
+        novo_user = st.text_input("Novo usuário")
+        nova_senha = st.text_input("Nova senha", type="password")
+        if st.button("Criar usuário"):
+            usuarios = carregar_usuarios()
+            if novo_user in usuarios:
+                st.warning("Usuário já existe.")
+            else:
+                usuarios[novo_user] = nova_senha
+                salvar_usuarios(usuarios)
+                st.success("Usuário criado com sucesso.")
 
 if "usuario" not in st.session_state:
     login()
